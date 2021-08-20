@@ -23,6 +23,42 @@ I used [Homebrew](https://brew.sh/) to install most of these.
   ```powershell
   cd ~/Music/Crates
   ```
+- Set `$files` variable to files to be processed
+  ```powershell
+  $files = Get-ChildItem -Recurse *.mp3
+  $files = Get-ChildItem -Recurse *.mp3 | ? { $_.LastAccessTime -gt (Get-Date).AddHours(-36) }
+  ```
+
+### Replace double quotes with 2 single quotes in file name (eyeD3 cannot read files with double quotes)
+
+```powershell
+foreach ($file in $files) {
+  $artist = $file.Name.Split(" - ")[0]
+  $title = $file.Name.Split(" - ")[1]
+  $file | Rename-Item -NewName ($artist.Replace("`"","'") + " - " + $title.Replace("`"","''"))
+}
+```
+
+### Bulk Fix Tags
+
+```powershell
+foreach ($file in $files) {
+  $id3 = eyeD3 $file
+  $artist = (($id3 | Select-String "artist") -split "artist: ")[1] -replace ":|\/","-"
+  $title = (($id3 | Select-String "title") -split "title: ")[1] -replace ":|\/","-"
+
+  $NewArtist = $artist.Replace("`"","'").Replace(" Feat. ",", ")
+  $NewTitle = $title.Replace("`"","''").Replace("Instrumental","Inst").Replace("Acapella","Acap")
+
+  if ($artist -ne $NewArtist -or $title -ne $NewTitle) {
+    Start-Sleep 1
+    Write-Host "$($file.FullName): $artist - $title ==> $NewArtist - $NewTitle" -ForegroundColor Cyan
+    eyeD3 $file -a $NewArtist -t $NewTitle
+  }
+}
+```
+
+Once done, use Finder to look for files modified. Drag into a temp Serato create and rescan those files ID3 tags to update them.
 
 ### Find Low Bitrate MP3s and Search Deezer for Replacements
 
@@ -32,7 +68,7 @@ This will look for files with a bitrate lower than the value specified, search D
 
 ```powershell
 $BitrateMinimum = 128
-foreach ($file in (Get-ChildItem -Recurse -File "*.mp3")) {
+foreach ($file in $files) {
   $id3 = eyeD3 $file
   $bitrate = (($id3 | Select-String "kb/s") -split "\[ |kb")[1].Replace("~",$null)
   if ($bitrate -le $BitrateMinimum) {
@@ -49,7 +85,7 @@ foreach ($file in (Get-ChildItem -Recurse -File "*.mp3")) {
     if ($rest.data.count -gt 0) {
       $result = ($rest.data | Sort-Object rank)[0]
       Write-Host " FOUND: $($result.artist.name) - $($result.title)" -ForegroundColor:Green
-      ($rest.data | Sort-Object rank).link | Out-File ~/Music/LowBitrateDownloads.txt -Append
+      ($rest.data | Sort-Object rank).link | Out-File ~/Music/downloadLinks.txt -Append
     } else {
       Write-Host " NOT FOUND" -ForegroundColor:Red
     }
@@ -57,25 +93,55 @@ foreach ($file in (Get-ChildItem -Recurse -File "*.mp3")) {
 }
 ```
 
-### File names to match song names
+### Rename Files to Match Song Names
 
 I like my file names to match my song names (`Artist - Title (Version).mp3`). One time I goofed editing files in Serato, selected hundreds of files and change the artist on all of them by accident. I was on the road, so I didn't have my backup, but I was able to use an iTunes script to change my artist tag by using the file name. It saved me a few times, so I've been doing that ever since.
 
-- Everything renamed is saved to the variable `$RenameFiles` so I can export to a .csv or review later in case something goes wrong (just as a precaution while I verify this works)
-  ```powershell
-  $RenameFiles = @()
-  foreach ($file in (Get-ChildItem -Recurse -File "*.mp3")) {
-    $id3 = eyeD3 $file
-    $artist = (($id3 | Select-String "artist") -split "artist: ")[1] -replace ":|\/","-"
-    $title = (($id3 | Select-String "title") -split "title: ")[1] -replace ":|\/","-"
-    if ($file.Name -ne "$artist - $title$($file.Extension)") {
-      Write-Host "Rename: $($file.Name) ==> $artist - $title$($file.Extension)" -ForegroundColor:Cyan
-      "Rename: $($file.Name) ==> $artist - $title$($file.Extension)" | Out-File ~/Music/RenameFiles$(Get-Date yyyyMMdd-HHmm).txt -Append
-      $RenameFiles += $file
-      $file | Rename-Item -NewName "$artist - $title$($file.Extension)"
+#### eyeD3 as Renamer
+
+```powershell
+$FixFiles = @()
+$RenamedFiles = @()
+for ($i=1; $i -le $files.count; $i++) {
+  $file = $files[$i]
+  $id3 = eyeD3 $file
+  Write-Progress -Activity $file.FullName -Status "$([math]::Round($i/$files.count*100))% Complete ~ File $i of $($files.count) ~ Renamed: $($RenamedFiles.count) ~ Errors: $($FixFiles.count)" -PercentComplete ($i/$files.count*100)
+  $a = (($id3 | Select-String "artist") -split "artist: ")[1] -replace "\/|\\","-"
+  $t = (($id3 | Select-String "title") -split "title: ")[1] -replace "\/|\\","-"
+  if ($id3.length -gt 0 -or $a.length -gt 0 -or $t.length -gt 0) {
+    if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne $file.Name.Split(" - ")[1].Replace($file.Extension,$null)) {
+      eyeD3 $file --rename '$artist - $title' -Q
+      $RenamedFiles += $file.FullName
     }
+  } else {
+    $FixFiles += $file
   }
-  ```
+}
+```
+
+#### PowerShell as Renamer
+
+```powershell
+$FixFiles = @()
+$RenamedFiles = @()
+for ($i=1; $i -le $files.count; $i++) {
+  $file = $files[$i]
+  $id3 = eyeD3 $file
+  Write-Progress -Activity $file.FullName -Status "$([math]::Round($i/$files.count*100))% Complete ~ File $i of $($files.count) ~ Renamed: $($RenamedFiles.count) ~ Errors: $($FixFiles.count)" -PercentComplete ($i/$files.count*100)
+  $a = (($id3 | Select-String "artist") -split "artist: ")[1] -replace "\/|\\","-"
+  $t = (($id3 | Select-String "title") -split "title: ")[1] -replace "\/|\\","-"
+  if ($id3.length -gt 0 -or $a.length -gt 0 -or $t.length -gt 0) {
+    if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne $file.Name.Split(" - ")[1].Replace($file.Extension,$null)) {
+      $file | Rename-Item -NewName "$a - $t$($file.Extension)"
+      $file.FullName | Tee-Object -Variable +RenamedFiles
+    }
+  } else {
+    $FixFiles += $file
+  }
+}
+```
+
+Everything renamed is saved to the variable `$RenameFiles` so I can export to a .csv or review later in case something goes wrong. Files with problems are saved to `$FixFiles`.
 
 ### Run MP3gain on Files Without the ReplayGain Tag
 
@@ -90,11 +156,11 @@ Info on [ReplayGain](https://en.wikipedia.org/wiki/ReplayGain) algorithm. This c
 | 89 db    | 0             |
 
 ```powershell
-foreach ($file in (Get-ChildItem -Recurse -File "*.mp3")) {
+foreach ($file in $files) {
   $id3 = eyeD3 $file -v
   $RelativeVolumeFrame = $id3 | Select-String "RVA" | ? { $_ -match "RAVD|RVA2" }
   if ($RelativeVolumeFrame.count -eq 0) {
-    Write-Host "Modifying: $file" -ForegroundColor White -BackgroundColor DarkBlue
+    Write-Host "Modifying: $file" -ForegroundColor Cyan
     $db = if ($file.Name -cmatch "Inst|Acap") {
       4
     } else {
