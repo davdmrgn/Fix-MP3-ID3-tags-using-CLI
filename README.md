@@ -97,8 +97,6 @@ foreach ($file in $files) {
 
 I like my file names to match my song names (`Artist - Title (Version).mp3`). One time I goofed editing files in Serato, selected hundreds of files and change the artist on all of them by accident. I was on the road, so I didn't have my backup, but I was able to use an iTunes script to change my artist tag by using the file name. It saved me a few times, so I've been doing that ever since.
 
-#### eyeD3 as Renamer
-
 ```powershell
 $FixFiles = @()
 $RenamedFiles = @()
@@ -112,28 +110,6 @@ for ($i=1; $i -le $files.count; $i++) {
     if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne $file.Name.Split(" - ")[1].Replace($file.Extension,$null)) {
       eyeD3 $file --rename '$artist - $title' -Q
       $RenamedFiles += $file.FullName
-    }
-  } else {
-    $FixFiles += $file
-  }
-}
-```
-
-#### PowerShell as Renamer
-
-```powershell
-$FixFiles = @()
-$RenamedFiles = @()
-for ($i=1; $i -le $files.count; $i++) {
-  $file = $files[$i]
-  $id3 = eyeD3 $file
-  Write-Progress -Activity $file.FullName -Status "$([math]::Round($i/$files.count*100))% Complete ~ File $i of $($files.count) ~ Renamed: $($RenamedFiles.count) ~ Errors: $($FixFiles.count)" -PercentComplete ($i/$files.count*100)
-  $a = (($id3 | Select-String "artist") -split "artist: ")[1] -replace "\/|\\","-"
-  $t = (($id3 | Select-String "title") -split "title: ")[1] -replace "\/|\\","-"
-  if ($id3.length -gt 0 -or $a.length -gt 0 -or $t.length -gt 0) {
-    if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne $file.Name.Split(" - ")[1].Replace($file.Extension,$null)) {
-      $file | Rename-Item -NewName "$a - $t$($file.Extension)"
-      $file.FullName | Tee-Object -Variable +RenamedFiles
     }
   } else {
     $FixFiles += $file
