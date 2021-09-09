@@ -100,7 +100,7 @@ I like my file names to match my song names (`Artist - Title (Version).mp3`). On
 ```powershell
 $FixFiles = @()
 $RenamedFiles = @()
-for ($i=1; $i -lt $files.count; $i++) {
+for ($i=0; $i -lt $files.count; $i++) {
   $file = $files[$i]
   $id3 = eyeD3 $file
   Write-Progress -Activity $file.FullName -Status "$([math]::Round($i/$files.count*100))% Complete ~ File $i of $($files.count) ~ Renamed: $($RenamedFiles.count) ~ Errors: $($FixFiles.count)" -PercentComplete ($i/$files.count*100)
