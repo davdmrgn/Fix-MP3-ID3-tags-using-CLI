@@ -107,7 +107,7 @@ for ($i=0; $i -lt $files.count; $i++) {
   $a = (($id3 | Select-String "artist") -split "artist: ")[1] -replace "\/|\\","-"
   $t = (($id3 | Select-String "title") -split "title: ")[1] -replace "\/|\\","-"
   if ($id3.length -gt 0 -or $a.length -gt 0 -or $t.length -gt 0) {
-    if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne $file.Name.Split(" - ")[1].Replace($file.Extension,$null)) {
+    if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne ($file.Name.Split(" - ")[1..3] -join " - ").Replace($file.Extension,$null)) {
       eyeD3 $file --rename '$artist - $title' -Q
       $RenamedFiles += $file.FullName
     }
