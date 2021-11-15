@@ -102,14 +102,30 @@ foreach ($file in $files) {
   $id3 = eyeD3 $file
   $a = (($id3 | Select-String "artist") -split "artist: ")[1] -replace "\/|\\","-"
   $t = (($id3 | Select-String "title") -split "title: ")[1] -replace "\/|\\","-"
+  $1 = $file.Name.Split(" - ")[0]
+  $2 = ($file.Name.Split(" - ")[1..3] -join " - ").Replace($file.Extension,$null)
   if ($id3.length -gt 0 -or $a.length -gt 0 -or $t.length -gt 0) {
-    if ($a -ne $file.Name.Split(" - ")[0] -or $t -ne ($file.Name.Split(" - ")[1..3] -join " - ").Replace($file.Extension,$null)) {
+    if ($a -ne $1 -or $t -ne $2) {
       eyeD3 $file --rename '$artist - $title' -Q
     }
   }
 }
 ```
 
+###  Set ID3 tags to _Artist_ - _Title_
+
+```powershell
+foreach ($file in $files) {
+  $id3 = eyeD3 $file
+  $a = (($id3 | Select-String "artist") -split "artist: ")[1] -replace "\/|\\","-"
+  $t = (($id3 | Select-String "title") -split "title: ")[1] -replace "\/|\\","-"
+  $1 = $file.Name.Split(" - ")[0]
+  $2 = ($file.Name.Split(" - ")[1..3] -join " - ").Replace($file.Extension,$null)
+  if ($1 -ne $a -or $2 -ne $t) {
+    eyeD3 $file -a $1 -t $2 -Q
+  }
+}
+```
 #### With progress indicator
 
 ```powershell
