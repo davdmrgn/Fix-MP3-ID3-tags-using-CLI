@@ -177,3 +177,47 @@ foreach ($file in $files) {
   }
 }
 ```
+
+### Get Song Year From Deezer
+
+This filter is set to only get tracks that have a special comment I have set which don't have a year tag. Uncomment the `$prompt` block to have the option to set the year. The index of each song is displayed in brackets, so the `$i` start index can be adjusted to skip a batch of songs if needed.
+
+```powershell
+for ($i=0; $i -lt $files.count; $i++) {
+  $file = $files[$i]
+  $id3 = eyeD3 $file
+  $color = $id3 | Select-String -Pattern "^\|(Red|Blue|Green|Yellow|Pink)"
+  $recording_date = $id3 | Select-String "recording date"
+  if ($color.length -gt 0 -and $recording_date.length -eq 0) {
+    $artist = (($id3 | Select-String "artist") -split "artist: ")[1]
+    $title = (($id3 | Select-String "title") -split "title: | \(")[1]
+    $URI = "https://api.deezer.com/search?q=artist:`'$($artist.ToLower())`' track:`'$($title.ToLower())`'"
+    $rest = Invoke-RestMethod -Uri $URI
+    if ($rest.data.count -gt 0) {
+      $results = $rest.data | ? { $_.artist.name -notmatch "various" } | Sort-Object rank
+      Write-Host "$($results.count) results: $artist - $title   [$i]"
+      if ($results.count -gt 0) {
+        $albums = $results.album
+        $albumdata = @()
+        foreach ($album in $albums) {
+          $albumdata += Invoke-RestMethod -Uri "https://api.deezer.com/album/$($album.id)"
+        }
+        $albumresults = $albumdata | ? { $_.artist.name -notmatch "Various" } | Sort-Object release_date | Select-Object -First 3
+        foreach ($albumresult in $albumresults) {
+          $albumartist = $albumresult.artist.name
+          $albumtitle = $albumresult.title
+          $albumrelease = $albumresult.release_date
+          Write-Host "   $albumrelease - $albumartist - $albumtitle"
+        }  <#
+        $year = ($albumrelease -split "-")[0]
+        $prompt = Read-Host -Prompt "Press Y to set year to $year. Enter to skip or manually enter year"
+        switch ($prompt) {
+          { $_ -match "y" } { eyeD3 $file -Y $year }
+          { $_ -match "^\d{4}$" } { eyeD3 $file -Y $prompt}
+          default { Write-Host "Skip" -ForegroundColor Cyan }
+        }  #>
+      }
+    }
+  }
+}
+```
