@@ -212,8 +212,8 @@ for ($i=0; $i -lt $files.count; $i++) {
         $year = ($albumrelease -split "-")[0]
         $prompt = Read-Host -Prompt "Press Y to set year to $year. Enter to skip or manually enter year"
         switch ($prompt) {
-          { $_ -match "y" } { eyeD3 $file --recording-date $year }
-          { $_ -match "^\d{4}$" } { eyeD3 $file --recording-date $prompt}
+          { $_ -match "y" } { eyeD3 $file --recording-date $year -Q }
+          { $_ -match "^\d{4}$" } { eyeD3 $file --recording-date $prompt -Q }
           default { Write-Host "Skip" -ForegroundColor Cyan }
         }  #>
       }
