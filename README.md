@@ -184,7 +184,8 @@ This filter is set to only get tracks that have a special comment I have set whi
 
 ```powershell
 for ($i=0; $i -lt $files.count; $i++) {
-  $file = $files[$i]
+  Write-Host "$i/$($files.count) [$([math]::Round($i/$($files.count)*100))%]`r" -NoNewline
+  $file = $files2[$i]
   $id3 = eyeD3 $file
   $color = $id3 | Select-String -Pattern "^\|(Red|Blue|Green|Yellow|Pink)"
   $recording_date = $id3 | Select-String "recording date"
@@ -195,7 +196,7 @@ for ($i=0; $i -lt $files.count; $i++) {
     $rest = Invoke-RestMethod -Uri $URI
     if ($rest.data.count -gt 0) {
       $results = $rest.data | ? { $_.artist.name -notmatch "various" } | Sort-Object rank
-      Write-Host "$($results.count) results: $artist - $title   [$i]"
+      Write-Host "`n$($results.count) results: $($file.Name)   [$i]"
       if ($results.count -gt 0) {
         $albums = $results.album
         $albumdata = @()
@@ -203,19 +204,21 @@ for ($i=0; $i -lt $files.count; $i++) {
           $albumdata += Invoke-RestMethod -Uri "https://api.deezer.com/album/$($album.id)"
         }
         $albumresults = $albumdata | ? { $_.artist.name -notmatch "Various" } | Sort-Object release_date | Select-Object -First 3
-        foreach ($albumresult in $albumresults) {
-          $albumartist = $albumresult.artist.name
-          $albumtitle = $albumresult.title
-          $albumrelease = $albumresult.release_date
-          Write-Host "   $albumrelease - $albumartist - $albumtitle"
-        }
-        $year = ($albumrelease -split "-")[0]
-        # Remove $null and uncomment the Read-Host below to prompt for changes to files
-        $prompt = $null #Read-Host -Prompt "Press Y to set year to $year. Enter to skip or manually enter year"
-        switch ($prompt) {
-          { $_ -match "y" } { eyeD3 $file --recording-date $year -Q }
-          { $_ -match "^\d{4}$" } { eyeD3 $file --recording-date $prompt -Q }
-          default { Write-Host "Skip" -ForegroundColor Cyan }
+        if ($albumresults.count -gt 0) {
+          foreach ($albumresult in $albumresults) {
+            $albumartist = $albumresult.artist.name
+            $albumtitle = $albumresult.title
+            $albumrelease = $albumresult.release_date
+            Write-Host "   $albumrelease - $albumartist - $albumtitle"
+          } 
+          $year = ($albumresults[0].release_date -split "-")[0]
+          # Remove $null and uncomment the Read-Host below to prompt for changes to files
+          $prompt = $null #Read-Host -Prompt "Press Y to set year to $year. Enter to skip or manually enter year"
+          switch ($prompt) {
+            { $_ -match "y" } { eyeD3 $file --recording-date $year -Q }
+            { $_ -match "^\d{4}$" } { eyeD3 $file --recording-date $prompt -Q }
+            default { Write-Host "Skip" -ForegroundColor Cyan }
+          }
         }
       }
     }
