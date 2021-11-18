@@ -185,7 +185,7 @@ This filter is set to only get tracks that have a special comment I have set whi
 ```powershell
 for ($i=0; $i -lt $files.count; $i++) {
   Write-Host "$i/$($files.count) [$([math]::Round($i/$($files.count)*100))%]`r" -NoNewline
-  $file = $files2[$i]
+  $file = $files[$i]
   $id3 = eyeD3 $file
   $color = $id3 | Select-String -Pattern "^\|(Red|Blue|Green|Yellow|Pink)"
   $recording_date = $id3 | Select-String "recording date"
